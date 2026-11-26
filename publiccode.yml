@@ -1,0 +1,54 @@
+# publiccode.yml — metadati per il catalogo Developers Italia / metadata for the Developers Italia catalogue
+publiccodeYmlVersion: "0"
+
+name: eduwisp-apps
+url: "https://github.com/EduWISP/eduwisp-apps"
+landingURL: "https://eduwisp.github.io/docs/moduli/android/"
+platforms:
+  - web
+  - linux
+
+categories:
+  - it-management
+
+developmentStatus: concept
+softwareType: "addon"
+
+intendedAudience:
+  scope:
+    - education
+  countries:
+    - IT
+
+description:
+  it:
+    shortDescription: "EduWISP — Gestione applicazioni"
+    longDescription: "Catalogo app EduWISP **multipiattaforma** (oggi APK Android firmati, sul modello di F-Droid; domani pacchetti di altre piattaforme), assegnazioni e configurazioni gestite. Fa parte di EduWISP, piattaforma open source e gratuita per la gestione dei dispositivi digitali di proprietà delle scuole, con MDM, gestione scolastica, Family Control e prevenzione del cyberbullismo. Il progetto è in fase di progettazione e rispetta come vincolo bloccante il GDPR e la normativa italiana su privacy e minori. Documentazione: https://eduwisp.github.io/docs/"
+    documentation: "https://eduwisp.github.io/docs/"
+    features:
+      - "Gestione applicazioni"
+  en:
+    shortDescription: "EduWISP — Application management"
+    longDescription: "**Multi-platform** EduWISP app catalogue (signed Android APKs first, F-Droid-like; other platforms' packages later), assignments and managed configurations. Part of EduWISP, a free and open-source platform to manage school-owned digital devices, with MDM, school management, family control and cyberbullying prevention. The project is in the design phase and treats GDPR and Italian law on privacy and minors as a blocking constraint. Documentation: https://eduwisp.github.io/docs/en/"
+    documentation: "https://eduwisp.github.io/docs/en/"
+    features:
+      - "Application management"
+
+legal:
+  license: AGPL-3.0-or-later
+  mainCopyrightOwner: Michele Salerno
+
+organisation:
+  name: EduWISP
+  uri: "https://github.com/EduWISP"
+
+maintenance:
+  type: community
+  contacts:
+    - name: Michele Salerno
+
+localisation:
+  localisationReady: true
+  availableLanguages:
+    - it
+    - en
