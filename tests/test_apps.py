@@ -152,7 +152,7 @@ def test_app_obbligatorie_dell_istituto(liceo):
     # Anche senza elenco attivo le obbligatorie arrivano al tablet
     AppPolicyState.objects.filter(organization=liceo["org"]).update(allowlist_enabled=False)
     apps = provide(liceo["tablet"](liceo["c1a"]))["policy"]["apps"]
-    assert apps["allowed"] == [{"id": "it.maieuticallabs.mylim", "required": True}]
+    assert apps["allowed"] == [{"id": "it.maieuticallabs.mylim", "required": True, "name": "MyLIM"}]
 
 
 def test_app_obbligatoria_deve_essere_consentita(liceo):

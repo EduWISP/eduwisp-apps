@@ -49,12 +49,17 @@ def _piattaforma(device, status):
     )
 
 
-def required_apps(device, classe=None):
-    return set(
+def required_names(device, classe=None):
+    """App obbligatorie: identificativo → nome da mostrare allo studente."""
+    return dict(
         RequiredApp.objects.filter(
             _ambito(classe), organization=device.organization, platform=device.platform
-        ).values_list("identifier", flat=True)
+        ).values_list("identifier", "name")
     )
+
+
+def required_apps(device, classe=None):
+    return set(required_names(device, classe))
 
 
 def allowed_apps(device, now=None, vietate=None):
@@ -62,7 +67,8 @@ def allowed_apps(device, now=None, vietate=None):
     now = now or timezone.now()
     vietate = _piattaforma(device, PlatformStatus.VIETATA) if vietate is None else vietate
     classe = classe_del_dispositivo(device)
-    obbligatorie = required_apps(device, classe) - vietate
+    nomi = required_names(device, classe)
+    obbligatorie = set(nomi) - vietate
     sempre = (
         _piattaforma(device, PlatformStatus.CONSENTITA)
         | set(
@@ -73,7 +79,8 @@ def allowed_apps(device, now=None, vietate=None):
         | obbligatorie
     ) - vietate
     elenco = [
-        {"id": i, "required": True} if i in obbligatorie else {"id": i} for i in sorted(sempre)
+        {"id": i, "required": True, "name": nomi[i][:100]} if i in obbligatorie else {"id": i}
+        for i in sorted(sempre)
     ]
     if classe is not None:
         scadenze = {}
@@ -99,9 +106,13 @@ def provide(device):
     if stato is not None and stato.allowlist_enabled:
         apps = {"mode": "allowlist", "allowed": allowed_apps(device, vietate=vietate)}
     else:
-        obbligatorie = sorted(required_apps(device, classe_del_dispositivo(device)) - vietate)
+        nomi = required_names(device, classe_del_dispositivo(device))
+        obbligatorie = sorted(set(nomi) - vietate)
         if not vietate and not obbligatorie:
             return None
-        apps = {"mode": "blocklist", "allowed": [{"id": i, "required": True} for i in obbligatorie]}
+        apps = {
+            "mode": "blocklist",
+            "allowed": [{"id": i, "required": True, "name": nomi[i][:100]} for i in obbligatorie],
+        }
     apps["blocked"] = sorted(vietate)
     return {"policy": {"apps": apps}, "version": versione}
