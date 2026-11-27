@@ -6,14 +6,14 @@
 
 Catalogo app EduWISP **multipiattaforma** (oggi APK Android firmati, sul modello di F-Droid; domani pacchetti di altre piattaforme), assegnazioni e configurazioni gestite.
 
-> 🚧 **Stato: progettazione.** Questo repository non contiene ancora codice. La progettazione è nella [documentazione EduWISP](https://eduwisp.github.io/docs/moduli/android/).
+> 🚧 **Stato: progettazione.** Questo repository non contiene ancora codice. La progettazione è nella [documentazione EduWISP](https://eduwisp.org/docs/moduli/android/).
 
-🇬🇧 ***Multi-platform** EduWISP app catalogue (signed Android APKs first, F-Droid-like; other platforms' packages later), assignments and managed configurations. **Status: design phase**, no code yet. See the [design docs](https://eduwisp.github.io/docs/en/modules/android/).*
+🇬🇧 ***Multi-platform** EduWISP app catalogue (signed Android APKs first, F-Droid-like; other platforms' packages later), assignments and managed configurations. **Status: design phase**, no code yet. See the [design docs](https://eduwisp.org/docs/en/modules/android/).*
 
 ## Documentazione / Documentation
 
-- Progettazione / Design: <https://eduwisp.github.io/docs/moduli/android/>
-- Mappa dei repository / Repository map: <https://eduwisp.github.io/docs/architettura/repository/>
+- Progettazione / Design: <https://eduwisp.org/docs/moduli/android/>
+- Mappa dei repository / Repository map: <https://eduwisp.org/docs/architettura/repository/>
 - Documentazione del modulo / Module docs: [`docs/user/`](docs/user/) · [`docs/developer/`](docs/developer/)
 
 ## Dipendenze / Dependencies
@@ -22,7 +22,7 @@ Catalogo app EduWISP **multipiattaforma** (oggi APK Android firmati, sul modello
 
 ## Privacy
 
-Dati personali previsti e regole: [PRIVACY.md](PRIVACY.md). Il rispetto della normativa su privacy e minori è un vincolo bloccante ([ADR-0008](https://eduwisp.github.io/docs/decisioni/0008-conformita-normativa/)).
+Dati personali previsti e regole: [PRIVACY.md](PRIVACY.md). Il rispetto della normativa su privacy e minori è un vincolo bloccante ([ADR-0008](https://eduwisp.org/docs/decisioni/0008-conformita-normativa/)).
 
 ## Responsabile del modulo / Module owner
 
@@ -34,7 +34,7 @@ Vedi [CONTRIBUTING](https://github.com/EduWISP/.github/blob/main/CONTRIBUTING.md
 
 ## Licenza / License
 
-**AGPL-3.0-or-later**, con termini aggiuntivi di attribuzione e tutela del nome (sezione 7): vedi [LICENSE](LICENSE) e [NOTICE.md](NOTICE.md). Chi usa o modifica EduWISP deve sempre indicare «Basato su EduWISP» e non può usare il nome e il logo per versioni modificate. Licenza scelta secondo le [linee guida AgID](https://eduwisp.github.io/docs/decisioni/0006-licenza/) per il software usato via rete.
+**AGPL-3.0-or-later**, con termini aggiuntivi di attribuzione e tutela del nome (sezione 7): vedi [LICENSE](LICENSE) e [NOTICE.md](NOTICE.md). Chi usa o modifica EduWISP deve sempre indicare «Basato su EduWISP» e non può usare il nome e il logo per versioni modificate. Licenza scelta secondo le [linee guida AgID](https://eduwisp.org/docs/decisioni/0006-licenza/) per il software usato via rete.
 
 *AGPL-3.0-or-later with additional attribution and trademark terms (section 7): see LICENSE and NOTICE.md.*
 
