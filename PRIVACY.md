@@ -14,6 +14,12 @@ Documento vivo: va aggiornato a ogni modifica che riguarda dati personali. Rifer
 - **Nessun inventario** delle app installate sui tablet viene inviato al server.
 - **APK** (ADR-0020): conservati fuori dai file pubblici, scaricabili solo dai tablet dell'istituto per cui l'app è obbligatoria; nessun dato personale.
 
+## Richieste di app (ADR-0021)
+
+- Si registrano: studente, classe, app richiesta, motivazione facoltativa dello studente, pareri dei familiari con motivazione, decisione con motivazione e autore.
+- Le vedono solo i docenti della classe, il dirigente e la famiglia (per i maggiorenni solo con il loro consenso); mai in elenchi generali (FAQ del Garante 6 e 7).
+- Le app per il singolo studente non riportano il motivo (per esempio un PDP): nessun dato sulla salute.
+
 ## Da definire prima dello sviluppo
 
 | Dato | Finalità | Base giuridica | Conservazione | Chi vi accede |

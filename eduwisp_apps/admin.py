@@ -22,7 +22,8 @@ class AppRuleInline(OrganizationScopedAdminMixin, admin.TabularInline):
     model = models.AppRule
     organization_roles = MANAGERS
     extra = 0
-    fields = ["organization", "track", "school_class", "required"]
+    fields = ["organization", "track", "school_class", "student", "required"]
+    autocomplete_fields = ["student"]
 
 
 @admin.register(models.App)
@@ -41,10 +42,10 @@ class AppAdmin(ScopedAdmin):
 
 @admin.register(models.AppRule)
 class AppRuleAdmin(ScopedAdmin):
-    list_display = ["app", "track", "school_class", "required", "organization"]
+    list_display = ["app", "track", "school_class", "student", "required", "organization"]
+    autocomplete_fields = ["app", "student"]
     list_editable = ["required"]
     list_filter = ["required", "track"]
-    autocomplete_fields = ["app"]
 
 
 @admin.register(models.TemporaryUnlock)
@@ -77,3 +78,29 @@ class PlatformAppAdmin(admin.ModelAdmin):
     has_add_permission = _solo_admin
     has_change_permission = _solo_admin
     has_delete_permission = _solo_admin
+
+
+class AppRequestOpinionInline(admin.TabularInline):
+    model = models.AppRequestOpinion
+    extra = 0
+    can_delete = False
+    readonly_fields = ["guardian", "reason", "created_at"]
+
+    def has_add_permission(self, request, obj=None):
+        return False
+
+
+@admin.register(models.AppRequest)
+class AppRequestAdmin(ScopedAdmin):
+    """Consultazione: le decisioni si prendono dal portale, con motivazione (ADR-0021)."""
+
+    list_display = ["identifier", "name", "student", "school_class", "status", "created_at"]
+    list_filter = ["status"]
+    readonly_fields = [f.name for f in models.AppRequest._meta.fields]
+    inlines = [AppRequestOpinionInline]
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False

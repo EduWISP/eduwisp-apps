@@ -33,12 +33,29 @@ def classe_del_dispositivo(device):
     return a.school_class if a else None
 
 
-def _ambito(classe):
-    q = Q(track__isnull=True, school_class__isnull=True)
+def studente_del_dispositivo(device):
+    """Lo studente a cui il tablet è affidato (solo tablet personali), oppure None."""
+    a = (
+        DeviceAssignment.objects.filter(device=device, ended_at__isnull=True, student__isnull=False)
+        .select_related("student")
+        .first()
+    )
+    return a.student if a else None
+
+
+def ambito(classe, studente=None):
+    """Regole valide per il tablet: istituto, indirizzo e classe, e quelle del suo studente.
+
+    Una regola d'istituto non ha né indirizzo, né classe, né studente: le regole per un
+    singolo studente non valgono mai per gli altri (ADR-0021).
+    """
+    q = Q(track__isnull=True, school_class__isnull=True, student__isnull=True)
     if classe is not None:
         q |= Q(school_class=classe)
         if classe.section.track_id:
             q |= Q(track_id=classe.section.track_id)
+    if studente is not None:
+        q |= Q(student=studente)
     return q
 
 
@@ -69,10 +86,10 @@ def voce_obbligatoria(app):
     return voce
 
 
-def required_apps(device, classe=None):
+def required_apps(device, classe=None, studente=None):
     """App obbligatorie per il dispositivo: identificativo → App del catalogo dell'istituto."""
     regole = AppRule.objects.filter(
-        _ambito(classe),
+        ambito(classe, studente),
         organization=device.organization,
         app__platform=device.platform,
         required=True,
@@ -85,13 +102,16 @@ def allowed_apps(device, now=None, vietate=None):
     now = now or timezone.now()
     vietate = _piattaforma(device, PlatformStatus.VIETATA) if vietate is None else vietate
     classe = classe_del_dispositivo(device)
-    obbligatorie_app = required_apps(device, classe)
+    studente = studente_del_dispositivo(device)
+    obbligatorie_app = required_apps(device, classe, studente)
     obbligatorie = set(obbligatorie_app) - vietate
     sempre = (
         _piattaforma(device, PlatformStatus.CONSENTITA)
         | set(
             AppRule.objects.filter(
-                _ambito(classe), organization=device.organization, app__platform=device.platform
+                ambito(classe, studente),
+                organization=device.organization,
+                app__platform=device.platform,
             ).values_list("app__identifier", flat=True)
         )
         | obbligatorie
@@ -124,7 +144,9 @@ def provide(device):
     if stato is not None and stato.allowlist_enabled:
         apps = {"mode": "allowlist", "allowed": allowed_apps(device, vietate=vietate)}
     else:
-        obbligatorie_app = required_apps(device, classe_del_dispositivo(device))
+        obbligatorie_app = required_apps(
+            device, classe_del_dispositivo(device), studente_del_dispositivo(device)
+        )
         obbligatorie = sorted(set(obbligatorie_app) - vietate)
         if not vietate and not obbligatorie:
             return None

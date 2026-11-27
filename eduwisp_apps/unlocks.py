@@ -79,7 +79,9 @@ def active_unlocks(school_class, now=None):
 
 
 def _regole_della_classe(school_class):
-    ambito = Q(track__isnull=True, school_class__isnull=True) | Q(school_class=school_class)
+    ambito = Q(track__isnull=True, school_class__isnull=True, student__isnull=True) | Q(
+        school_class=school_class
+    )
     if school_class.section.track_id:
         ambito |= Q(track_id=school_class.section.track_id)
     return AppRule.objects.filter(ambito, organization=school_class.organization)
