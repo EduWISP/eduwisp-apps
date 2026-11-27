@@ -136,6 +136,18 @@ def allowed_apps(device, now=None, vietate=None):
     return elenco
 
 
+def requests_of_student(studente):
+    """Stato dell'ultima richiesta per ogni app dello studente (ADR-0021)."""
+    from .models import AppRequest
+
+    if studente is None:
+        return []
+    ultime = {}
+    for r in AppRequest.objects.filter(student=studente).order_by("created_at")[:500]:
+        ultime[r.identifier] = r.status
+    return [{"id": i, "status": st} for i, st in sorted(ultime.items())][:200]
+
+
 def provide(device):
     stato = AppPolicyState.objects.filter(organization=device.organization).first()
     vietate = _piattaforma(device, PlatformStatus.VIETATA)
@@ -155,4 +167,7 @@ def provide(device):
             "allowed": [voce_obbligatoria(obbligatorie_app[i]) for i in obbligatorie],
         }
     apps["blocked"] = sorted(vietate)
+    richieste = requests_of_student(studente_del_dispositivo(device))
+    if richieste:
+        apps["requests"] = richieste
     return {"policy": {"apps": apps}, "version": versione}

@@ -92,6 +92,9 @@ def test_richiesta_parere_e_approvazione_solo_per_lo_studente(scuola):
     assert chiedi(api).status_code == 200  # una sola richiesta in attesa per app
     richiesta = AppRequest.objects.get()
     assert richiesta.school_class == scuola["c1a"]
+    stato = provide(d_anna)["policy"]["apps"]["requests"]
+    assert stato == [{"id": "org.example.dizionario", "status": "pending"}]
+    assert "requests" not in provide(d_luca)["policy"]["apps"]  # solo le proprie
 
     add_opinion(scuola["madre"], richiesta, "Le serve per i compiti di latino.")
     with pytest.raises(ValidationError):
@@ -104,6 +107,7 @@ def test_richiesta_parere_e_approvazione_solo_per_lo_studente(scuola):
     assert richiesta.status == RequestStatus.APPROVATA
     assert "org.example.dizionario" in ids(d_anna)
     assert "org.example.dizionario" not in ids(d_luca)  # solo per Anna
+    assert provide(d_anna)["policy"]["apps"]["requests"][0]["status"] == "approved"
     azioni = set(AuditEvent.objects.values_list("action", flat=True))
     assert {Action.APP_REQUEST_DECISION, Action.APP_REQUEST_OPINION} <= azioni
 
