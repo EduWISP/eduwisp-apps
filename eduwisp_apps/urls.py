@@ -4,8 +4,11 @@
 
 from django.urls import path
 
-from .views import ApkView
+from .views import ApkView, AppRequestView
 
 app_name = "eduwisp_apps"
 
-urlpatterns = [path("api/protocol/v0/apps/<int:pk>/apk", ApkView.as_view(), name="apk")]
+urlpatterns = [
+    path("api/protocol/v0/apps/<int:pk>/apk", ApkView.as_view(), name="apk"),
+    path("api/protocol/v0/app-requests", AppRequestView.as_view(), name="app_requests"),
+]

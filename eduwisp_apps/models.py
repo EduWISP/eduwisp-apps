@@ -16,7 +16,7 @@ from django.core.validators import FileExtensionValidator, RegexValidator
 from django.db import models
 from django.utils import timezone
 from django.utils.deconstruct import deconstructible
-from eduwisp_school.models import SchoolClass, Track
+from eduwisp_school.models import SchoolClass, Student, Track
 from eduwisp_users.models import OrganizationOwned
 
 MAX_SBLOCCO = timedelta(hours=4)
@@ -200,30 +200,40 @@ class AppRule(OrganizationOwned):
     school_class = models.ForeignKey(
         SchoolClass, on_delete=models.CASCADE, null=True, blank=True, verbose_name="classe"
     )
+    student = models.ForeignKey(
+        Student,
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name="app_rules",
+        verbose_name="studente",
+        help_text="solo per questo studente (per esempio strumenti del PDP); il motivo non si "
+        "registra (ADR-0021)",
+    )
     required = models.BooleanField(
         "obbligatoria",
         default=False,
         help_text="il tablet la installa da solo se nel catalogo c'è l'APK, altrimenti la "
         "propone allo studente (ADR-0020)",
     )
-    same_organization_fields = ("app", "track", "school_class")
+    same_organization_fields = ("app", "track", "school_class", "student")
 
     class Meta:
         verbose_name = "app consentita"
         verbose_name_plural = "app consentite"
 
     def __str__(self):
-        ambito = self.school_class or self.track or "tutto l'istituto"
+        ambito = self.student or self.school_class or self.track or "tutto l'istituto"
         return f"{self.app} — {ambito}"
 
     def clean(self):
         super().clean()
-        if self.track_id and self.school_class_id:
-            raise ValidationError("Scegli un indirizzo oppure una classe, non entrambi.")
+        if sum(bool(x) for x in (self.track_id, self.school_class_id, self.student_id)) > 1:
+            raise ValidationError("Scegli un indirizzo, una classe oppure uno studente, uno solo.")
         if not self.app_id:
             return
         doppia = AppRule.objects.filter(
-            app=self.app, track=self.track, school_class=self.school_class
+            app=self.app, track=self.track, school_class=self.school_class, student=self.student
         ).exclude(pk=self.pk)
         if doppia.exists():
             raise ValidationError("Questa app è già consentita in questo ambito.")
@@ -275,3 +285,77 @@ class TemporaryUnlock(OrganizationOwned):
                 raise ValidationError({"ends_at": "La fine deve essere dopo l'inizio."})
             if self.ends_at - self.starts_at > MAX_SBLOCCO:
                 raise ValidationError({"ends_at": "Uno sblocco dura al massimo 4 ore."})
+
+
+class RequestStatus(models.TextChoices):
+    IN_ATTESA = "pending", "in attesa"
+    APPROVATA = "approved", "approvata"
+    RESPINTA = "rejected", "respinta"
+
+
+class AppRequest(OrganizationOwned):
+    """Richiesta di usare un'app, fatta dallo studente dal suo tablet (ADR-0021)."""
+
+    student = models.ForeignKey(
+        Student, on_delete=models.CASCADE, related_name="app_requests", verbose_name="studente"
+    )
+    school_class = models.ForeignKey(
+        SchoolClass,
+        on_delete=models.SET_NULL,
+        null=True,
+        related_name="app_requests",
+        verbose_name="classe",
+    )
+    platform = models.CharField("piattaforma", max_length=32, default="android")
+    identifier = models.CharField("identificativo", max_length=255, validators=[IDENTIFICATIVO])
+    name = models.CharField("nome dell'app", max_length=100, blank=True)
+    note = models.CharField("motivazione dello studente", max_length=300, blank=True)
+    created_at = models.DateTimeField("chiesta il", auto_now_add=True)
+    status = models.CharField(
+        "stato", max_length=20, choices=RequestStatus.choices, default=RequestStatus.IN_ATTESA
+    )
+    decided_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="+",
+        verbose_name="deciso da",
+    )
+    decided_at = models.DateTimeField("deciso il", null=True, blank=True)
+    decision_reason = models.TextField("motivazione della decisione", blank=True)
+    same_organization_fields = ("student", "school_class")
+
+    class Meta:
+        verbose_name = "richiesta di app"
+        verbose_name_plural = "richieste di app"
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return f"{self.name or self.identifier} — {self.student} ({self.get_status_display()})"
+
+
+class AppRequestOpinion(models.Model):
+    """Parere favorevole di un familiare, con motivazione (ADR-0021)."""
+
+    request = models.ForeignKey(
+        AppRequest, on_delete=models.CASCADE, related_name="opinions", verbose_name="richiesta"
+    )
+    guardian = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="+",
+        verbose_name="familiare",
+    )
+    reason = models.TextField("motivazione")
+    created_at = models.DateTimeField("dato il", auto_now_add=True)
+
+    class Meta:
+        verbose_name = "parere della famiglia"
+        verbose_name_plural = "pareri della famiglia"
+        constraints = [
+            models.UniqueConstraint(fields=["request", "guardian"], name="un_parere_per_familiare")
+        ]
+
+    def __str__(self):
+        return f"Parere di {self.guardian} su {self.request}"
