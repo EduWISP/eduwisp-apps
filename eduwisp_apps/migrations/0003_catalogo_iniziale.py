@@ -13,6 +13,8 @@ CONSENTITE = {
         ("Google Classroom", "com.google.android.apps.classroom"),
         ("MyLIM (Loescher)", "it.maieuticallabs.mylim"),
         ("Booktab (Zanichelli)", "it.zanichelli.booktab"),
+        # Argo: registro elettronico per famiglie e studenti. Pacchetto da verificare sul Play Store.
+        ("didUP - Famiglia (Argo)", "it.argosoft.didup.famiglia.new"),
         ("GeoGebra Calculator Suite", "org.geogebra.android.calculator.suite"),
         ("GeoGebra Classic", "org.geogebra.android"),
         ("GeoGebra Geometria", "org.geogebra.android.geometry"),
