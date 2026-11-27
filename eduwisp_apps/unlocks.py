@@ -5,12 +5,13 @@
 from datetime import timedelta
 
 from django.core.exceptions import PermissionDenied, ValidationError
+from django.db.models import Q
 from django.utils import timezone
 from eduwisp_audit.log import record
 from eduwisp_audit.models import Action
 from eduwisp_school.queries import classes_for_teacher
 
-from .models import MAX_SBLOCCO, App, TemporaryUnlock
+from .models import MAX_SBLOCCO, App, AppRule, TemporaryUnlock
 
 DURATE_MINUTI = (30, 60, 120, 240)
 
@@ -73,14 +74,20 @@ def active_unlocks(school_class, now=None):
     ).select_related("app", "teacher")
 
 
-def unlockable_apps(school_class):
-    """App del catalogo che si possono sbloccare (non già consentite per la classe)."""
-    from django.db.models import Q
-
-    from .models import AppRule
-
+def _regole_della_classe(school_class):
     ambito = Q(track__isnull=True, school_class__isnull=True) | Q(school_class=school_class)
     if school_class.section.track_id:
         ambito |= Q(track_id=school_class.section.track_id)
-    consentite = AppRule.objects.filter(ambito).values_list("app_id", flat=True)
-    return App.objects.filter(organization=school_class.organization).exclude(pk__in=consentite)
+    return AppRule.objects.filter(ambito, organization=school_class.organization)
+
+
+def allowed_apps_for_class(school_class):
+    """App sempre consentite nella classe (istituto, indirizzo e classe)."""
+    ids = _regole_della_classe(school_class).values_list("app_id", flat=True)
+    return App.objects.filter(pk__in=ids)
+
+
+def unlockable_apps(school_class):
+    """App del catalogo che si possono sbloccare (non già consentite per la classe)."""
+    ids = _regole_della_classe(school_class).values_list("app_id", flat=True)
+    return App.objects.filter(organization=school_class.organization).exclude(pk__in=ids)

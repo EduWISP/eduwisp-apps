@@ -23,7 +23,7 @@ from rest_framework.test import APIClient
 
 from eduwisp_apps.models import App, AppPolicyState, AppRule
 from eduwisp_apps.policy import provide
-from eduwisp_apps.unlocks import end_unlock, unlock, unlockable_apps
+from eduwisp_apps.unlocks import allowed_apps_for_class, end_unlock, unlock, unlockable_apps
 
 pytestmark = pytest.mark.django_db
 
@@ -139,6 +139,7 @@ def test_al_massimo_quattro_ore(liceo):
 def test_app_sbloccabili_escludono_quelle_gia_consentite(liceo):
     nomi = {a.name for a in unlockable_apps(liceo["c1a"])}
     assert nomi == {"Pydroid", "Wikipedia"}
+    assert {a.name for a in allowed_apps_for_class(liceo["c1a"])} == {"Firefox", "GeoGebra"}
 
 
 def test_regola_con_indirizzo_e_classe_rifiutata(liceo):
