@@ -8,7 +8,9 @@
 - ``required``: app obbligatorie decise dall'istituto (ADR-0019).
 """
 
+from django.conf import settings
 from django.db.models import Q
+from django.urls import reverse
 from django.utils import timezone
 from eduwisp_devices.models import DeviceAssignment
 
@@ -18,7 +20,6 @@ from .models import (
     PlatformApp,
     PlatformCatalogVersion,
     PlatformStatus,
-    RequiredApp,
     TemporaryUnlock,
 )
 
@@ -49,17 +50,34 @@ def _piattaforma(device, status):
     )
 
 
-def required_names(device, classe=None):
-    """App obbligatorie: identificativo → nome da mostrare allo studente."""
-    return dict(
-        RequiredApp.objects.filter(
-            _ambito(classe), organization=device.organization, platform=device.platform
-        ).values_list("identifier", "name")
-    )
+def _url(percorso):
+    base = getattr(settings, "EDUWISP_PUBLIC_URL", "").rstrip("/")
+    return f"{base}{percorso}" if base else None
+
+
+def voce_obbligatoria(app):
+    """Voce del protocollo per un'app obbligatoria: nome, logo e APK se presenti (ADR-0020)."""
+    voce = {"id": app.identifier, "required": True, "name": app.name[:100]}
+    if app.icon:
+        icona = _url(app.icon.url)
+        if icona:
+            voce["icon"] = icona
+    if app.apk and app.apk_sha256:
+        indirizzo = _url(reverse("eduwisp_apps:apk", args=[app.pk]))
+        if indirizzo:
+            voce["install"] = {"url": indirizzo, "sha256": app.apk_sha256, "size": app.apk_size}
+    return voce
 
 
 def required_apps(device, classe=None):
-    return set(required_names(device, classe))
+    """App obbligatorie per il dispositivo: identificativo → App del catalogo dell'istituto."""
+    regole = AppRule.objects.filter(
+        _ambito(classe),
+        organization=device.organization,
+        app__platform=device.platform,
+        required=True,
+    ).select_related("app")
+    return {r.app.identifier: r.app for r in regole}
 
 
 def allowed_apps(device, now=None, vietate=None):
@@ -67,8 +85,8 @@ def allowed_apps(device, now=None, vietate=None):
     now = now or timezone.now()
     vietate = _piattaforma(device, PlatformStatus.VIETATA) if vietate is None else vietate
     classe = classe_del_dispositivo(device)
-    nomi = required_names(device, classe)
-    obbligatorie = set(nomi) - vietate
+    obbligatorie_app = required_apps(device, classe)
+    obbligatorie = set(obbligatorie_app) - vietate
     sempre = (
         _piattaforma(device, PlatformStatus.CONSENTITA)
         | set(
@@ -79,7 +97,7 @@ def allowed_apps(device, now=None, vietate=None):
         | obbligatorie
     ) - vietate
     elenco = [
-        {"id": i, "required": True, "name": nomi[i][:100]} if i in obbligatorie else {"id": i}
+        voce_obbligatoria(obbligatorie_app[i]) if i in obbligatorie else {"id": i}
         for i in sorted(sempre)
     ]
     if classe is not None:
@@ -106,13 +124,13 @@ def provide(device):
     if stato is not None and stato.allowlist_enabled:
         apps = {"mode": "allowlist", "allowed": allowed_apps(device, vietate=vietate)}
     else:
-        nomi = required_names(device, classe_del_dispositivo(device))
-        obbligatorie = sorted(set(nomi) - vietate)
+        obbligatorie_app = required_apps(device, classe_del_dispositivo(device))
+        obbligatorie = sorted(set(obbligatorie_app) - vietate)
         if not vietate and not obbligatorie:
             return None
         apps = {
             "mode": "blocklist",
-            "allowed": [{"id": i, "required": True, "name": nomi[i][:100]} for i in obbligatorie],
+            "allowed": [voce_obbligatoria(obbligatorie_app[i]) for i in obbligatorie],
         }
     apps["blocked"] = sorted(vietate)
     return {"policy": {"apps": apps}, "version": versione}

@@ -130,37 +130,91 @@ def test_vietata_dopo_resta_bloccata(liceo):
     assert "org.example.browser" in apps["blocked"]
 
 
-def test_app_obbligatorie_dell_istituto(liceo):
-    from eduwisp_apps.models import RequiredApp
-
-    r = RequiredApp(organization=liceo["org"], name="MyLIM", identifier="it.maieuticallabs.mylim")
-    r.full_clean()
-    r.save()
-    RequiredApp.objects.create(
-        organization=liceo["org"],
-        name="Python",
-        identifier="org.example.python",
+def test_app_obbligatorie_con_la_spunta(liceo):
+    org = liceo["org"]
+    mylim = App.objects.create(organization=org, name="MyLIM", identifier="it.maieuticallabs.mylim")
+    AppRule.objects.create(organization=org, app=mylim, required=True)
+    AppRule.objects.create(
+        organization=org,
+        app=liceo["app"]["python"],
         track=liceo["c1e"].section.track,
+        required=True,
     )
     voci = {a["id"]: a for a in provide(liceo["tablet"](liceo["c1e"]))["policy"]["apps"]["allowed"]}
-    assert voci["it.maieuticallabs.mylim"]["required"] is True
+    assert voci["it.maieuticallabs.mylim"] == {
+        "id": "it.maieuticallabs.mylim",
+        "required": True,
+        "name": "MyLIM",
+    }
     assert voci["org.example.python"]["required"] is True
     voci_a = {
         a["id"]: a for a in provide(liceo["tablet"](liceo["c1a"]))["policy"]["apps"]["allowed"]
     }
     assert "required" not in voci_a.get("org.example.python", {})
     # Anche senza elenco attivo le obbligatorie arrivano al tablet
-    AppPolicyState.objects.filter(organization=liceo["org"]).update(allowlist_enabled=False)
+    AppPolicyState.objects.filter(organization=org).update(allowlist_enabled=False)
     apps = provide(liceo["tablet"](liceo["c1a"]))["policy"]["apps"]
-    assert apps["allowed"] == [{"id": "it.maieuticallabs.mylim", "required": True, "name": "MyLIM"}]
+    assert [a["id"] for a in apps["allowed"]] == ["it.maieuticallabs.mylim"]
 
 
-def test_app_obbligatoria_deve_essere_consentita(liceo):
-    from eduwisp_apps.models import RequiredApp
+@pytest.fixture
+def con_apk(liceo, settings, tmp_path):
+    from django.core.files.base import ContentFile
 
-    for ident in ("com.zhiliaoapp.musically", "com.sconosciuta.app"):
-        with pytest.raises(ValidationError):
-            RequiredApp(organization=liceo["org"], name="X", identifier=ident).full_clean()
+    settings.EDUWISP_PRIVATE_MEDIA_ROOT = tmp_path / "privato"
+    settings.MEDIA_ROOT = tmp_path / "media"
+    app = liceo["app"]["python"]
+    app.apk.save("python.apk", ContentFile(b"PK finto apk"), save=False)
+    app.icon.save("python.png", ContentFile(b"\x89PNG finto"), save=False)
+    app.save()
+    AppRule.objects.create(organization=liceo["org"], app=app, required=True)
+    return app
+
+
+def test_apk_e_logo_nella_policy(liceo, con_apk):
+    import hashlib
+
+    voce = next(
+        a
+        for a in provide(liceo["tablet"](liceo["c1a"]))["policy"]["apps"]["allowed"]
+        if a["id"] == "org.example.python"
+    )
+    validate(
+        "policy",
+        {
+            "protocol_version": "0",
+            "policy_version": 1,
+            "poll_interval_seconds": 900,
+            "settings": {},
+            "apps": {"mode": "allowlist", "allowed": [voce]},
+        },
+    )
+    assert voce["install"]["sha256"] == hashlib.sha256(b"PK finto apk").hexdigest()
+    assert voce["install"]["url"] == f"https://demo.example/api/protocol/v0/apps/{con_apk.pk}/apk"
+    assert voce["icon"].startswith("https://demo.example/media/app/icone/")
+
+
+def test_download_dell_apk_solo_per_i_dispositivi_giusti(liceo, con_apk):
+    def client_per(device):
+        token = device.issue_token()
+        device.save()
+        api = APIClient()
+        api.credentials(HTTP_AUTHORIZATION="Bearer " + token)
+        return api
+
+    url = f"/api/protocol/v0/apps/{con_apk.pk}/apk"
+    assert APIClient().get(url).status_code == 401
+    r = client_per(liceo["tablet"](liceo["c1a"])).get(url)
+    assert r.status_code == 200 and b"".join(r.streaming_content) == b"PK finto apk"
+    # Un dispositivo di un altro istituto non lo scarica
+    altro = Organization.objects.create(name="Altro", slug="altro")
+    d = Device(organization=altro, platform="android", agent_version="0.3", os_version="15")
+    d.issue_token()
+    d.save()
+    assert client_per(d).get(url).status_code == 404
+    # Senza spunta «obbligatoria» l'APK non si scarica
+    AppRule.objects.filter(app=con_apk).update(required=False)
+    assert client_per(liceo["tablet"](liceo["c1a"])).get(url).status_code == 404
 
 
 def test_la_versione_cresce_a_ogni_modifica(liceo):

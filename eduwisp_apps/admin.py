@@ -18,16 +18,32 @@ class AppPolicyStateAdmin(ScopedAdmin):
     list_display = ["organization", "allowlist_enabled", "version"]
 
 
+class AppRuleInline(OrganizationScopedAdminMixin, admin.TabularInline):
+    model = models.AppRule
+    organization_roles = MANAGERS
+    extra = 0
+    fields = ["organization", "track", "school_class", "required"]
+
+
 @admin.register(models.App)
 class AppAdmin(ScopedAdmin):
-    list_display = ["name", "identifier", "platform", "organization"]
+    """Elenco unico (ADR-0020): l'app, dove è consentita e se è obbligatoria."""
+
+    list_display = ["name", "identifier", "platform", "con_apk", "organization"]
     search_fields = ["name", "identifier"]
+    readonly_fields = ["apk_sha256", "apk_size"]
+    inlines = [AppRuleInline]
+
+    @admin.display(boolean=True, description="APK")
+    def con_apk(self, obj):
+        return bool(obj.apk)
 
 
 @admin.register(models.AppRule)
 class AppRuleAdmin(ScopedAdmin):
-    list_display = ["app", "track", "school_class", "organization"]
-    list_filter = ["track"]
+    list_display = ["app", "track", "school_class", "required", "organization"]
+    list_editable = ["required"]
+    list_filter = ["required", "track"]
     autocomplete_fields = ["app"]
 
 
@@ -43,11 +59,6 @@ class TemporaryUnlockAdmin(ScopedAdmin):
 
     def has_change_permission(self, request, obj=None):
         return False
-
-
-@admin.register(models.RequiredApp)
-class RequiredAppAdmin(ScopedAdmin):
-    list_display = ["name", "identifier", "track", "school_class", "organization"]
 
 
 @admin.register(models.PlatformApp)

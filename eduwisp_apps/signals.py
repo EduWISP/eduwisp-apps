@@ -12,7 +12,6 @@ from .models import (
     AppRule,
     PlatformApp,
     PlatformCatalogVersion,
-    RequiredApp,
     TemporaryUnlock,
 )
 
@@ -28,8 +27,6 @@ def incrementa(organization_id):
 @receiver(post_delete, sender=AppRule)
 @receiver(post_save, sender=TemporaryUnlock)
 @receiver(post_delete, sender=TemporaryUnlock)
-@receiver(post_save, sender=RequiredApp)
-@receiver(post_delete, sender=RequiredApp)
 def _cambiato(sender, instance, **kwargs):
     incrementa(instance.organization_id)
 
