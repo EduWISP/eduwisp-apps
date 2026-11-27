@@ -25,5 +25,5 @@ def carica(apps, schema_editor):
 
 
 class Migration(migrations.Migration):
-    dependencies = [("eduwisp_apps", "0004_elenco_unico")]
+    dependencies = [("eduwisp_apps", "0006_rimuovi_vecchio_elenco")]
     operations = [migrations.RunPython(carica, migrations.RunPython.noop)]

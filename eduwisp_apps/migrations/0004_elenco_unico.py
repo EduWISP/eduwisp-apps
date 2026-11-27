@@ -7,32 +7,6 @@ import eduwisp_apps.models
 from django.db import migrations, models
 
 
-def converti_obbligatorie(apps, schema_editor):
-    """Le vecchie app obbligatorie diventano app consentite con la spunta (ADR-0020)."""
-    RequiredApp = apps.get_model("eduwisp_apps", "RequiredApp")
-    App = apps.get_model("eduwisp_apps", "App")
-    AppRule = apps.get_model("eduwisp_apps", "AppRule")
-    for r in RequiredApp.objects.all():
-        app, _ = App.objects.get_or_create(
-            organization_id=r.organization_id,
-            platform=r.platform,
-            identifier=r.identifier,
-            defaults={"name": r.name},
-        )
-        regola = AppRule.objects.filter(
-            app=app, track_id=r.track_id, school_class_id=r.school_class_id
-        ).first()
-        if regola is None:
-            regola = AppRule(
-                organization_id=r.organization_id,
-                app=app,
-                track_id=r.track_id,
-                school_class_id=r.school_class_id,
-            )
-        regola.required = True
-        regola.save()
-
-
 class Migration(migrations.Migration):
 
     dependencies = [
@@ -99,9 +73,5 @@ class Migration(migrations.Migration):
                 help_text="il tablet la installa da solo se nel catalogo c'è l'APK, altrimenti la propone allo studente (ADR-0020)",
                 verbose_name="obbligatoria",
             ),
-        ),
-        migrations.RunPython(converti_obbligatorie, migrations.RunPython.noop),
-        migrations.DeleteModel(
-            name="RequiredApp",
         ),
     ]
