@@ -12,6 +12,7 @@ Documento vivo: va aggiornato a ogni modifica che riguarda dati personali. Rifer
 - Il modulo conserva il **catalogo** delle app dell'istituto e le **regole** per istituto, indirizzo e classe: nessun dato personale.
 - Gli **sblocchi temporanei** registrano docente, classe, app e orari; lo sblocco e la fine anticipata vanno anche nel registro delle operazioni.
 - **Nessun inventario** delle app installate sui tablet viene inviato al server.
+- **APK** (ADR-0020): conservati fuori dai file pubblici, scaricabili solo dai tablet dell'istituto per cui l'app è obbligatoria; nessun dato personale.
 
 ## Da definire prima dello sviluppo
 

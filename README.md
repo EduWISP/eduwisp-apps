@@ -15,11 +15,14 @@ Catalogo app EduWISP **multipiattaforma** (oggi APK Android firmati, sul modello
 - **Elenco attivo** solo quando l'istituto lo attiva (`AppPolicyState`): da quel momento sui tablet le altre app con icona vengono sospese.
 - **Sblocco temporaneo**: un docente sblocca un'app del catalogo per una delle sue classi, al massimo per 4 ore; la policy porta la scadenza, così il tablet richiude l'app anche senza rete. Sblocchi e richiusure anticipate sono registrati in eduwisp-audit.
 - **Catalogo della piattaforma**, gestito solo dall'amministratore di sistema: app **consentite in tutti gli istituti** (istruzione, ufficio, comunicazione: per esempio Classroom, Teams, MyLIM, WhatsApp) e app **vietate ovunque** (social, incontri, VPN, Tor, browser con VPN integrata). Le vietate sono bloccate anche negli istituti che non usano l'elenco di app consentite, e nessuno le può consentire o sbloccare.
-- **App obbligatorie** decise dall'istituto (per tutti, per indirizzo o per classe): il tablet le segnala allo studente finché non sono installate.
+- **Elenco unico con la spunta «obbligatoria»** ([ADR-0020](https://eduwisp.org/docs/decisioni/0020-app-obbligatorie/)): ogni app consentita può essere obbligatoria per tutti, per un indirizzo o per una classe, e avere il suo **logo**. Se nel catalogo c'è l'**APK** (app libera o fornito dall'editore), il tablet la **installa da solo** appena registrato, verificando l'impronta SHA-256; altrimenti la propone allo studente con il pulsante «Installa». Gli APK non sono pubblici: li scaricano solo i tablet dell'istituto per cui l'app è obbligatoria.
 - Si collega a eduwisp-devices come contributo alla policy:
 
 ```python
 EDUWISP_POLICY_PROVIDERS = ["eduwisp_apps.policy.provide"]
+EDUWISP_PUBLIC_URL = "https://eduwisp.scuola.example"  # per gli indirizzi di logo e APK
+EDUWISP_PRIVATE_MEDIA_ROOT = "/var/lib/eduwisp/privato"  # APK, non serviti da nginx
+# urls.py: path("", include("eduwisp_apps.urls"))
 ```
 
 🇬🇧 ***Multi-platform** EduWISP app catalogue (signed Android APKs first, F-Droid-like; other platforms' packages later), assignments and managed configurations. **Status: prototype v0**: app allowlist per school, track and class, with audited temporary unlocks by teachers (ADR-0019). See the [design docs](https://eduwisp.org/docs/en/modules/android/).*

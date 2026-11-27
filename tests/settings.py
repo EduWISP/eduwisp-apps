@@ -55,3 +55,7 @@ STATIC_URL = "static/"
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 EDUWISP_POLICY_PROVIDERS = ["eduwisp_apps.policy.provide"]
 EDUWISP_ENVIRONMENT_NOTICE = ""
+EDUWISP_PUBLIC_URL = "https://demo.example"
+MEDIA_URL = "/media/"
+MEDIA_ROOT = BASE_DIR / "media-test"
+EDUWISP_PRIVATE_MEDIA_ROOT = BASE_DIR / "privato-test"

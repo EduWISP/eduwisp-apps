@@ -6,17 +6,43 @@ Elenco per istituto, indirizzo e classe; sblocchi temporanei dei docenti per le 
 Le app non consentite vengono sospese sul tablet dall'agente.
 """
 
+import hashlib
 from datetime import timedelta
 
 from django.conf import settings
 from django.core.exceptions import ValidationError
-from django.core.validators import RegexValidator
+from django.core.files.storage import FileSystemStorage
+from django.core.validators import FileExtensionValidator, RegexValidator
 from django.db import models
 from django.utils import timezone
+from django.utils.deconstruct import deconstructible
 from eduwisp_school.models import SchoolClass, Track
 from eduwisp_users.models import OrganizationOwned
 
 MAX_SBLOCCO = timedelta(hours=4)
+
+
+def archivio_privato():
+    """Gli APK non sono pubblici: stanno fuori da MEDIA_ROOT e li scaricano solo i dispositivi."""
+    # Nessun ripiego su BASE_DIR: non tutti i progetti lo definiscono.
+    return FileSystemStorage(
+        location=getattr(settings, "EDUWISP_PRIVATE_MEDIA_ROOT", None) or "privato"
+    )
+
+
+@deconstructible
+class DimensioneMassima:
+    """Rifiuta i file più grandi di ``kb`` kilobyte."""
+
+    def __init__(self, kb):
+        self.kb = kb
+
+    def __call__(self, file):
+        if file.size > self.kb * 1024:
+            raise ValidationError(f"File troppo grande: al massimo {self.kb} KB.")
+
+    def __eq__(self, other):
+        return isinstance(other, DimensioneMassima) and other.kb == self.kb
 
 
 IDENTIFICATIVO = RegexValidator(r"^[A-Za-z0-9_][A-Za-z0-9._-]{0,254}$")
@@ -106,6 +132,28 @@ class App(OrganizationOwned):
         validators=[IDENTIFICATIVO],
     )
     description = models.CharField("descrizione", max_length=200, blank=True)
+    icon = models.FileField(
+        "logo",
+        upload_to="app/icone/",
+        blank=True,
+        validators=[FileExtensionValidator(["png", "webp", "jpg", "jpeg"]), DimensioneMassima(512)],
+        help_text="PNG, WebP o JPEG, al massimo 512 KB; mostrato nel portale e sul tablet",
+    )
+    apk = models.FileField(
+        "APK",
+        upload_to="apk/",
+        storage=archivio_privato,
+        blank=True,
+        validators=[FileExtensionValidator(["apk"]), DimensioneMassima(300 * 1024)],
+        help_text="facoltativo: se l'app è obbligatoria, il tablet la installa da solo (ADR-0020). "
+        "Solo APK liberi o forniti dall'editore.",
+    )
+    apk_sha256 = models.CharField(
+        "impronta SHA-256 dell'APK", max_length=64, blank=True, editable=False
+    )
+    apk_size = models.PositiveBigIntegerField(
+        "dimensione dell'APK", null=True, blank=True, editable=False
+    )
 
     class Meta:
         verbose_name = "app"
@@ -127,52 +175,19 @@ class App(OrganizationOwned):
                 {"identifier": "App vietata in tutti gli istituti: non si può consentire."}
             )
 
-
-class RequiredApp(OrganizationOwned):
-    """App obbligatoria, decisa dall'istituto: per tutti, per un indirizzo o per una classe.
-
-    Deve essere consentita (catalogo della piattaforma o dell'istituto). Il tablet la segnala
-    allo studente finché non è installata.
-    """
-
-    name = models.CharField("nome", max_length=100)
-    platform = models.CharField("piattaforma", max_length=32, default="android")
-    identifier = models.CharField("identificativo", max_length=255, validators=[IDENTIFICATIVO])
-    track = models.ForeignKey(
-        Track, on_delete=models.CASCADE, null=True, blank=True, verbose_name="indirizzo"
-    )
-    school_class = models.ForeignKey(
-        SchoolClass, on_delete=models.CASCADE, null=True, blank=True, verbose_name="classe"
-    )
-    same_organization_fields = ("track", "school_class")
-
-    class Meta:
-        verbose_name = "app obbligatoria"
-        verbose_name_plural = "app obbligatorie"
-        ordering = ["name"]
-
-    def __str__(self):
-        ambito = self.school_class or self.track or "tutto l'istituto"
-        return f"{self.name} — {ambito}"
-
-    def clean(self):
-        super().clean()
-        if self.track_id and self.school_class_id:
-            raise ValidationError("Scegli un indirizzo oppure una classe, non entrambi.")
-        if is_forbidden(self.platform, self.identifier):
-            raise ValidationError({"identifier": "Questa app è vietata in tutti gli istituti."})
-        consentita = (
-            PlatformApp.objects.filter(
-                platform=self.platform, identifier=self.identifier, status=PlatformStatus.CONSENTITA
-            ).exists()
-            or App.objects.filter(
-                organization_id=self.organization_id,
-                platform=self.platform,
-                identifier=self.identifier,
-            ).exists()
-        )
-        if not consentita:
-            raise ValidationError({"identifier": "Aggiungi prima l'app al catalogo dell'istituto."})
+    def save(self, *args, **kwargs):
+        """Calcola impronta e dimensione dell'APK quando il file è nuovo o cambiato."""
+        if not self.apk:
+            self.apk_sha256, self.apk_size = "", None
+        else:
+            prima = App.objects.filter(pk=self.pk).values_list("apk", flat=True).first()
+            if prima != self.apk.name or not self.apk_sha256:
+                impronta = hashlib.sha256()
+                self.apk.open("rb")
+                for blocco in self.apk.chunks():
+                    impronta.update(blocco)
+                self.apk_sha256, self.apk_size = impronta.hexdigest(), self.apk.size
+        super().save(*args, **kwargs)
 
 
 class AppRule(OrganizationOwned):
@@ -184,6 +199,12 @@ class AppRule(OrganizationOwned):
     )
     school_class = models.ForeignKey(
         SchoolClass, on_delete=models.CASCADE, null=True, blank=True, verbose_name="classe"
+    )
+    required = models.BooleanField(
+        "obbligatoria",
+        default=False,
+        help_text="il tablet la installa da solo se nel catalogo c'è l'APK, altrimenti la "
+        "propone allo studente (ADR-0020)",
     )
     same_organization_fields = ("app", "track", "school_class")
 
