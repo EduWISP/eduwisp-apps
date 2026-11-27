@@ -53,10 +53,10 @@ def liceo():
         return App.objects.create(organization=org, name=nome, identifier=ident)
 
     catalogo = {
-        "firefox": app("Firefox", "org.mozilla.firefox"),
-        "geogebra": app("GeoGebra", "org.geogebra.android"),
-        "python": app("Pydroid", "ru.iiec.pydroid3"),
-        "wiki": app("Wikipedia", "org.wikipedia"),
+        "firefox": app("Browser di prova", "org.example.browser"),
+        "geogebra": app("Geometria di prova", "org.example.geometria"),
+        "python": app("Python di prova", "org.example.python"),
+        "wiki": app("Enciclopedia di prova", "org.example.enciclopedia"),
     }
     AppRule.objects.create(organization=org, app=catalogo["firefox"])
     AppRule.objects.create(organization=org, app=catalogo["python"], track=sa)
@@ -81,19 +81,86 @@ def liceo():
 
 
 def ids(device):
-    return [a["id"] for a in provide(device)["policy"]["apps"]["allowed"]]
+    """Solo le app del catalogo dell'istituto (quelle della piattaforma sono sempre presenti)."""
+    return [
+        a["id"]
+        for a in provide(device)["policy"]["apps"]["allowed"]
+        if a["id"].startswith("org.example.")
+    ]
 
 
 def test_livelli_si_sommano(liceo):
-    assert ids(liceo["tablet"](liceo["c1a"])) == ["org.geogebra.android", "org.mozilla.firefox"]
-    assert ids(liceo["tablet"](liceo["c1e"])) == ["org.mozilla.firefox", "ru.iiec.pydroid3"]
+    assert ids(liceo["tablet"](liceo["c1a"])) == ["org.example.browser", "org.example.geometria"]
+    assert ids(liceo["tablet"](liceo["c1e"])) == ["org.example.browser", "org.example.python"]
 
 
-def test_elenco_non_attivo_nessun_contributo(liceo):
+def test_elenco_non_attivo_restano_vietate_le_app_della_piattaforma(liceo):
     stato = AppPolicyState.objects.get(organization=liceo["org"])
     stato.allowlist_enabled = False
     stato.save()
-    assert provide(liceo["tablet"](liceo["c1a"])) is None
+    apps = provide(liceo["tablet"](liceo["c1a"]))["policy"]["apps"]
+    assert apps["mode"] == "blocklist" and apps["allowed"] == []
+    assert {"com.zhiliaoapp.musically", "com.snapchat.android", "org.torproject.torbrowser"} <= set(
+        apps["blocked"]
+    )
+
+
+def test_app_della_piattaforma_consentite_e_vietate(liceo):
+    apps = provide(liceo["tablet"](liceo["c1a"]))["policy"]["apps"]
+    consentite = {a["id"] for a in apps["allowed"]}
+    assert {"com.microsoft.teams", "it.maieuticallabs.mylim", "com.whatsapp"} <= consentite
+    assert "com.instagram.android" in apps["blocked"]
+    assert not consentite & set(apps["blocked"])
+
+
+def test_app_vietata_non_entra_nel_catalogo(liceo):
+    a = App(organization=liceo["org"], name="TikTok", identifier="com.zhiliaoapp.musically")
+    with pytest.raises(ValidationError):
+        a.full_clean()
+
+
+def test_vietata_dopo_resta_bloccata(liceo):
+    from eduwisp_apps.models import PlatformApp
+
+    PlatformApp.objects.create(
+        name="Browser di prova", identifier="org.example.browser", category="vpn", status="vietata"
+    )
+    apps = provide(liceo["tablet"](liceo["c1a"]))["policy"]["apps"]
+    assert "org.example.browser" not in {a["id"] for a in apps["allowed"]}
+    assert "org.example.browser" in apps["blocked"]
+
+
+def test_app_obbligatorie_dell_istituto(liceo):
+    from eduwisp_apps.models import RequiredApp
+
+    r = RequiredApp(organization=liceo["org"], name="MyLIM", identifier="it.maieuticallabs.mylim")
+    r.full_clean()
+    r.save()
+    RequiredApp.objects.create(
+        organization=liceo["org"],
+        name="Python",
+        identifier="org.example.python",
+        track=liceo["c1e"].section.track,
+    )
+    voci = {a["id"]: a for a in provide(liceo["tablet"](liceo["c1e"]))["policy"]["apps"]["allowed"]}
+    assert voci["it.maieuticallabs.mylim"]["required"] is True
+    assert voci["org.example.python"]["required"] is True
+    voci_a = {
+        a["id"]: a for a in provide(liceo["tablet"](liceo["c1a"]))["policy"]["apps"]["allowed"]
+    }
+    assert "required" not in voci_a.get("org.example.python", {})
+    # Anche senza elenco attivo le obbligatorie arrivano al tablet
+    AppPolicyState.objects.filter(organization=liceo["org"]).update(allowlist_enabled=False)
+    apps = provide(liceo["tablet"](liceo["c1a"]))["policy"]["apps"]
+    assert apps["allowed"] == [{"id": "it.maieuticallabs.mylim", "required": True}]
+
+
+def test_app_obbligatoria_deve_essere_consentita(liceo):
+    from eduwisp_apps.models import RequiredApp
+
+    for ident in ("com.zhiliaoapp.musically", "com.sconosciuta.app"):
+        with pytest.raises(ValidationError):
+            RequiredApp(organization=liceo["org"], name="X", identifier=ident).full_clean()
 
 
 def test_la_versione_cresce_a_ogni_modifica(liceo):
@@ -106,13 +173,15 @@ def test_la_versione_cresce_a_ogni_modifica(liceo):
 def test_sblocco_del_docente_con_scadenza_e_registro(liceo):
     d = liceo["tablet"](liceo["c1a"])
     s = unlock(liceo["docente"], liceo["c1a"], liceo["app"]["wiki"], 60)
-    voce = [a for a in provide(d)["policy"]["apps"]["allowed"] if a["id"] == "org.wikipedia"][0]
+    voce = [
+        a for a in provide(d)["policy"]["apps"]["allowed"] if a["id"] == "org.example.enciclopedia"
+    ][0]
     assert voce["until"] == s.ends_at.isoformat()
     assert AuditEvent.objects.filter(action=Action.APP_UNLOCK).count() == 1
     # Solo per quella classe
-    assert "org.wikipedia" not in ids(liceo["tablet"](liceo["c1e"]))
+    assert "org.example.enciclopedia" not in ids(liceo["tablet"](liceo["c1e"]))
     end_unlock(liceo["docente"], s)
-    assert "org.wikipedia" not in ids(d)
+    assert "org.example.enciclopedia" not in ids(d)
     assert AuditEvent.objects.filter(action=Action.APP_UNLOCK_END).count() == 1
 
 
@@ -122,7 +191,7 @@ def test_sblocco_scaduto_non_conta(liceo):
     s.starts_at -= timedelta(hours=1)
     s.ends_at = timezone.now() - timedelta(minutes=1)
     s.save()
-    assert "org.wikipedia" not in ids(d)
+    assert "org.example.enciclopedia" not in ids(d)
 
 
 def test_docente_solo_nelle_sue_classi(liceo):
@@ -138,8 +207,15 @@ def test_al_massimo_quattro_ore(liceo):
 
 def test_app_sbloccabili_escludono_quelle_gia_consentite(liceo):
     nomi = {a.name for a in unlockable_apps(liceo["c1a"])}
-    assert nomi == {"Pydroid", "Wikipedia"}
-    assert {a.name for a in allowed_apps_for_class(liceo["c1a"])} == {"Firefox", "GeoGebra"}
+    assert nomi == {"Python di prova", "Enciclopedia di prova"}
+    consentite = {a.name for a in allowed_apps_for_class(liceo["c1a"])}
+    assert {
+        "Browser di prova",
+        "Geometria di prova",
+        "Microsoft Teams",
+        "MyLIM (Loescher)",
+    } <= consentite
+    assert "TikTok" not in consentite
 
 
 def test_regola_con_indirizzo_e_classe_rifiutata(liceo):
@@ -162,4 +238,4 @@ def test_policy_dal_protocollo(liceo):
     policy = api.get("/api/protocol/v0/policy").json()
     validate("policy", policy)
     assert policy["apps"]["mode"] == "allowlist"
-    assert {"id": "org.mozilla.firefox"} in policy["apps"]["allowed"]
+    assert {"id": "org.example.browser"} in policy["apps"]["allowed"]

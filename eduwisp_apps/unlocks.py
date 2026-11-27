@@ -11,7 +11,7 @@ from eduwisp_audit.log import record
 from eduwisp_audit.models import Action
 from eduwisp_school.queries import classes_for_teacher
 
-from .models import MAX_SBLOCCO, App, AppRule, TemporaryUnlock
+from .models import MAX_SBLOCCO, App, AppRule, PlatformApp, PlatformStatus, TemporaryUnlock
 
 DURATE_MINUTI = (30, 60, 120, 240)
 
@@ -25,6 +25,10 @@ def unlock(user, school_class, app, minutes):
         raise PermissionDenied("Puoi sbloccare app solo nelle tue classi.")
     if app.organization_id != school_class.organization_id:
         raise PermissionDenied("L'app non è nel catalogo di questo istituto.")
+    if PlatformApp.objects.filter(
+        platform=app.platform, identifier=app.identifier, status=PlatformStatus.VIETATA
+    ).exists():
+        raise PermissionDenied("Questa app è vietata in tutti gli istituti.")
     durata = timedelta(minutes=int(minutes))
     if durata <= timedelta(0) or durata > MAX_SBLOCCO:
         raise ValidationError("Uno sblocco dura al massimo 4 ore.")
@@ -81,13 +85,35 @@ def _regole_della_classe(school_class):
     return AppRule.objects.filter(ambito, organization=school_class.organization)
 
 
+def _identificativi_consentiti(school_class):
+    regole = set(_regole_della_classe(school_class).values_list("app__identifier", flat=True))
+    piattaforma = set(
+        PlatformApp.objects.filter(status=PlatformStatus.CONSENTITA).values_list(
+            "identifier", flat=True
+        )
+    )
+    return regole | piattaforma
+
+
 def allowed_apps_for_class(school_class):
-    """App sempre consentite nella classe (istituto, indirizzo e classe)."""
-    ids = _regole_della_classe(school_class).values_list("app_id", flat=True)
-    return App.objects.filter(pk__in=ids)
+    """App sempre consentite nella classe: piattaforma, istituto, indirizzo e classe."""
+    vietate = PlatformApp.objects.filter(status=PlatformStatus.VIETATA).values_list(
+        "identifier", flat=True
+    )
+    regole = App.objects.filter(
+        pk__in=_regole_della_classe(school_class).values_list("app_id", flat=True)
+    ).exclude(identifier__in=vietate)
+    piattaforma = PlatformApp.objects.filter(status=PlatformStatus.CONSENTITA)
+    return sorted([*regole, *piattaforma], key=lambda a: a.name.lower())
 
 
 def unlockable_apps(school_class):
-    """App del catalogo che si possono sbloccare (non già consentite per la classe)."""
-    ids = _regole_della_classe(school_class).values_list("app_id", flat=True)
-    return App.objects.filter(organization=school_class.organization).exclude(pk__in=ids)
+    """App del catalogo dell'istituto che si possono sbloccare: non già consentite, non vietate."""
+    vietate = PlatformApp.objects.filter(status=PlatformStatus.VIETATA).values_list(
+        "identifier", flat=True
+    )
+    return (
+        App.objects.filter(organization=school_class.organization)
+        .exclude(identifier__in=_identificativi_consentiti(school_class))
+        .exclude(identifier__in=vietate)
+    )

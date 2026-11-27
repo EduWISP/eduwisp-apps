@@ -14,6 +14,8 @@ Catalogo app EduWISP **multipiattaforma** (oggi APK Android firmati, sul modello
 - **App consentite** per tutto l'istituto, per un indirizzo o per una classe: i livelli si sommano.
 - **Elenco attivo** solo quando l'istituto lo attiva (`AppPolicyState`): da quel momento sui tablet le altre app con icona vengono sospese.
 - **Sblocco temporaneo**: un docente sblocca un'app del catalogo per una delle sue classi, al massimo per 4 ore; la policy porta la scadenza, così il tablet richiude l'app anche senza rete. Sblocchi e richiusure anticipate sono registrati in eduwisp-audit.
+- **Catalogo della piattaforma**, gestito solo dall'amministratore di sistema: app **consentite in tutti gli istituti** (istruzione, ufficio, comunicazione: per esempio Classroom, Teams, MyLIM, WhatsApp) e app **vietate ovunque** (social, incontri, VPN, Tor, browser con VPN integrata). Le vietate sono bloccate anche negli istituti che non usano l'elenco di app consentite, e nessuno le può consentire o sbloccare.
+- **App obbligatorie** decise dall'istituto (per tutti, per indirizzo o per classe): il tablet le segnala allo studente finché non sono installate.
 - Si collega a eduwisp-devices come contributo alla policy:
 
 ```python

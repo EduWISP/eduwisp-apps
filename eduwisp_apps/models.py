@@ -19,6 +19,59 @@ from eduwisp_users.models import OrganizationOwned
 MAX_SBLOCCO = timedelta(hours=4)
 
 
+IDENTIFICATIVO = RegexValidator(r"^[A-Za-z0-9_][A-Za-z0-9._-]{0,254}$")
+
+
+class PlatformStatus(models.TextChoices):
+    CONSENTITA = "consentita", "consentita in tutti gli istituti"
+    VIETATA = "vietata", "vietata in tutti gli istituti"
+
+
+class PlatformApp(models.Model):
+    """Catalogo della piattaforma, deciso dall'amministratore di sistema (ADR-0019).
+
+    Le app **vietate** (social, VPN, Tor, browser con VPN...) restano bloccate in ogni istituto,
+    anche senza elenco di app consentite, e nessuno le può consentire o sbloccare. Le app
+    **consentite** (per esempio quelle di istruzione) valgono per tutti gli istituti che usano
+    l'elenco di app consentite.
+    """
+
+    name = models.CharField("nome", max_length=100)
+    platform = models.CharField("piattaforma", max_length=32, default="android")
+    identifier = models.CharField("identificativo", max_length=255, validators=[IDENTIFICATIVO])
+    category = models.CharField("categoria", max_length=50)
+    status = models.CharField("stato", max_length=20, choices=PlatformStatus.choices)
+
+    class Meta:
+        verbose_name = "app della piattaforma"
+        verbose_name_plural = "catalogo della piattaforma"
+        ordering = ["status", "category", "name"]
+        constraints = [
+            models.UniqueConstraint(fields=["platform", "identifier"], name="app_piattaforma_unica")
+        ]
+
+    def __str__(self):
+        return f"{self.name} ({self.get_status_display()})"
+
+
+class PlatformCatalogVersion(models.Model):
+    """Versione del catalogo della piattaforma: cresce a ogni modifica (riga unica)."""
+
+    version = models.PositiveIntegerField(default=0)
+
+    class Meta:
+        verbose_name = "versione del catalogo della piattaforma"
+
+    def __str__(self):
+        return f"Catalogo della piattaforma v{self.version}"
+
+
+def is_forbidden(platform, identifier):
+    return PlatformApp.objects.filter(
+        platform=platform, identifier=identifier, status=PlatformStatus.VIETATA
+    ).exists()
+
+
 class AppPolicyState(OrganizationOwned):
     """Stato delle app consentite dell'istituto: attivazione e versione (cresce a ogni modifica)."""
 
@@ -50,7 +103,7 @@ class App(OrganizationOwned):
         "identificativo",
         max_length=255,
         help_text="per Android il nome del pacchetto, per esempio org.mozilla.firefox",
-        validators=[RegexValidator(r"^[A-Za-z0-9_][A-Za-z0-9._-]{0,254}$")],
+        validators=[IDENTIFICATIVO],
     )
     description = models.CharField("descrizione", max_length=200, blank=True)
 
@@ -66,6 +119,60 @@ class App(OrganizationOwned):
 
     def __str__(self):
         return self.name
+
+    def clean(self):
+        super().clean()
+        if is_forbidden(self.platform, self.identifier):
+            raise ValidationError(
+                {"identifier": "App vietata in tutti gli istituti: non si può consentire."}
+            )
+
+
+class RequiredApp(OrganizationOwned):
+    """App obbligatoria, decisa dall'istituto: per tutti, per un indirizzo o per una classe.
+
+    Deve essere consentita (catalogo della piattaforma o dell'istituto). Il tablet la segnala
+    allo studente finché non è installata.
+    """
+
+    name = models.CharField("nome", max_length=100)
+    platform = models.CharField("piattaforma", max_length=32, default="android")
+    identifier = models.CharField("identificativo", max_length=255, validators=[IDENTIFICATIVO])
+    track = models.ForeignKey(
+        Track, on_delete=models.CASCADE, null=True, blank=True, verbose_name="indirizzo"
+    )
+    school_class = models.ForeignKey(
+        SchoolClass, on_delete=models.CASCADE, null=True, blank=True, verbose_name="classe"
+    )
+    same_organization_fields = ("track", "school_class")
+
+    class Meta:
+        verbose_name = "app obbligatoria"
+        verbose_name_plural = "app obbligatorie"
+        ordering = ["name"]
+
+    def __str__(self):
+        ambito = self.school_class or self.track or "tutto l'istituto"
+        return f"{self.name} — {ambito}"
+
+    def clean(self):
+        super().clean()
+        if self.track_id and self.school_class_id:
+            raise ValidationError("Scegli un indirizzo oppure una classe, non entrambi.")
+        if is_forbidden(self.platform, self.identifier):
+            raise ValidationError({"identifier": "Questa app è vietata in tutti gli istituti."})
+        consentita = (
+            PlatformApp.objects.filter(
+                platform=self.platform, identifier=self.identifier, status=PlatformStatus.CONSENTITA
+            ).exists()
+            or App.objects.filter(
+                organization_id=self.organization_id,
+                platform=self.platform,
+                identifier=self.identifier,
+            ).exists()
+        )
+        if not consentita:
+            raise ValidationError({"identifier": "Aggiungi prima l'app al catalogo dell'istituto."})
 
 
 class AppRule(OrganizationOwned):
