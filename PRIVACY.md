@@ -7,6 +7,12 @@ Documento vivo: va aggiornato a ogni modifica che riguarda dati personali. Rifer
 - Elenco delle app assegnate per classe, gruppo o dispositivo.
 - Report di installazione (solo app gestite).
 
+## Prototipo v0 (ADR-0019)
+
+- Il modulo conserva il **catalogo** delle app dell'istituto e le **regole** per istituto, indirizzo e classe: nessun dato personale.
+- Gli **sblocchi temporanei** registrano docente, classe, app e orari; lo sblocco e la fine anticipata vanno anche nel registro delle operazioni.
+- **Nessun inventario** delle app installate sui tablet viene inviato al server.
+
 ## Da definire prima dello sviluppo
 
 | Dato | Finalità | Base giuridica | Conservazione | Chi vi accede |

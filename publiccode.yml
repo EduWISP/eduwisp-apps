@@ -11,7 +11,7 @@ platforms:
 categories:
   - it-management
 
-developmentStatus: concept
+developmentStatus: development
 softwareType: "addon"
 
 intendedAudience:

@@ -6,9 +6,23 @@
 
 Catalogo app EduWISP **multipiattaforma** (oggi APK Android firmati, sul modello di F-Droid; domani pacchetti di altre piattaforme), assegnazioni e configurazioni gestite.
 
-> 🚧 **Stato: progettazione.** Questo repository non contiene ancora codice. La progettazione è nella [documentazione EduWISP](https://eduwisp.org/docs/moduli/android/).
+> 🧪 **Stato: prototipo v0.** **App consentite** ([ADR-0019](https://eduwisp.org/docs/decisioni/0019-app-consentite/)): catalogo dell'istituto, elenco per istituto, indirizzo e classe, sblocchi temporanei dei docenti. Il catalogo di APK firmati è ancora in progettazione ([documentazione](https://eduwisp.org/docs/moduli/android/)).
 
-🇬🇧 ***Multi-platform** EduWISP app catalogue (signed Android APKs first, F-Droid-like; other platforms' packages later), assignments and managed configurations. **Status: design phase**, no code yet. See the [design docs](https://eduwisp.org/docs/en/modules/android/).*
+## App consentite / App allowlist
+
+- **Catalogo dell'istituto**: nome e identificativo dell'app (per Android il nome del pacchetto).
+- **App consentite** per tutto l'istituto, per un indirizzo o per una classe: i livelli si sommano.
+- **Elenco attivo** solo quando l'istituto lo attiva (`AppPolicyState`): da quel momento sui tablet le altre app con icona vengono sospese.
+- **Sblocco temporaneo**: un docente sblocca un'app del catalogo per una delle sue classi, al massimo per 4 ore; la policy porta la scadenza, così il tablet richiude l'app anche senza rete. Sblocchi e richiusure anticipate sono registrati in eduwisp-audit.
+- **Catalogo della piattaforma**, gestito solo dall'amministratore di sistema: app **consentite in tutti gli istituti** (istruzione, ufficio, comunicazione: per esempio Classroom, Teams, MyLIM, WhatsApp) e app **vietate ovunque** (social, incontri, VPN, Tor, browser con VPN integrata). Le vietate sono bloccate anche negli istituti che non usano l'elenco di app consentite, e nessuno le può consentire o sbloccare.
+- **App obbligatorie** decise dall'istituto (per tutti, per indirizzo o per classe): il tablet le segnala allo studente finché non sono installate.
+- Si collega a eduwisp-devices come contributo alla policy:
+
+```python
+EDUWISP_POLICY_PROVIDERS = ["eduwisp_apps.policy.provide"]
+```
+
+🇬🇧 ***Multi-platform** EduWISP app catalogue (signed Android APKs first, F-Droid-like; other platforms' packages later), assignments and managed configurations. **Status: prototype v0**: app allowlist per school, track and class, with audited temporary unlocks by teachers (ADR-0019). See the [design docs](https://eduwisp.org/docs/en/modules/android/).*
 
 ## Documentazione / Documentation
 
