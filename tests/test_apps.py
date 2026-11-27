@@ -293,3 +293,13 @@ def test_policy_dal_protocollo(liceo):
     validate("policy", policy)
     assert policy["apps"]["mode"] == "allowlist"
     assert {"id": "org.example.browser"} in policy["apps"]["allowed"]
+
+
+def test_archivio_privato_senza_base_dir(settings):
+    from eduwisp_apps.models import archivio_privato
+
+    del settings.BASE_DIR
+    settings.EDUWISP_PRIVATE_MEDIA_ROOT = "/var/lib/eduwisp/privato"
+    assert archivio_privato().location == "/var/lib/eduwisp/privato"
+    del settings.EDUWISP_PRIVATE_MEDIA_ROOT
+    assert archivio_privato().location.endswith("privato")

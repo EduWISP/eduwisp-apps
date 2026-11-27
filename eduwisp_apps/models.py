@@ -24,8 +24,9 @@ MAX_SBLOCCO = timedelta(hours=4)
 
 def archivio_privato():
     """Gli APK non sono pubblici: stanno fuori da MEDIA_ROOT e li scaricano solo i dispositivi."""
+    # Nessun ripiego su BASE_DIR: non tutti i progetti lo definiscono.
     return FileSystemStorage(
-        location=getattr(settings, "EDUWISP_PRIVATE_MEDIA_ROOT", settings.BASE_DIR / "privato")
+        location=getattr(settings, "EDUWISP_PRIVATE_MEDIA_ROOT", None) or "privato"
     )
 
 
