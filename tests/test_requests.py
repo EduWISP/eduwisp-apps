@@ -157,7 +157,7 @@ def test_parere_solo_dei_familiari_e_motivato(scuola):
         add_opinion(User.objects.create_user("estraneo"), richiesta, "sì")
     # Maggiorenne senza consenso: la famiglia non dà pareri
     anna = scuola["anna"]
-    anna.adult_on = date(2000, 1, 1)
+    anna.birth_date = date(1982, 1, 1)
     anna.save()
     with pytest.raises(PermissionDenied):
         add_opinion(scuola["madre"], richiesta, "sì")
