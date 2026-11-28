@@ -106,7 +106,10 @@ def allowed_apps_for_class(school_class):
         pk__in=_regole_della_classe(school_class).values_list("app_id", flat=True)
     ).exclude(identifier__in=vietate)
     piattaforma = PlatformApp.objects.filter(status=PlatformStatus.CONSENTITA)
-    return sorted([*regole, *piattaforma], key=lambda a: a.name.lower())
+    # Una sola voce per identificativo: quella dell'istituto (con logo) prevale sul catalogo
+    uniche = {a.identifier: a for a in piattaforma}
+    uniche.update({a.identifier: a for a in regole})
+    return sorted(uniche.values(), key=lambda a: a.name.lower())
 
 
 def unlockable_apps(school_class):

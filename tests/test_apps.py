@@ -272,6 +272,19 @@ def test_app_sbloccabili_escludono_quelle_gia_consentite(liceo):
     assert "TikTok" not in consentite
 
 
+def test_app_consentite_senza_doppioni(liceo):
+    """Un'app nel catalogo della piattaforma e anche in quello dell'istituto compare una volta."""
+    from eduwisp_apps.models import AppRule, PlatformApp
+
+    teams = PlatformApp.objects.get(identifier="com.microsoft.teams")
+    mia = App.objects.create(
+        organization=liceo["org"], name="Teams della scuola", identifier=teams.identifier
+    )
+    AppRule.objects.create(organization=liceo["org"], app=mia)
+    voci = [a for a in allowed_apps_for_class(liceo["c1a"]) if a.identifier == teams.identifier]
+    assert voci == [mia]
+
+
 def test_regola_con_indirizzo_e_classe_rifiutata(liceo):
     r = AppRule(
         organization=liceo["org"],
